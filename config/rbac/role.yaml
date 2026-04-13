@@ -30,3 +30,13 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - osac.openshift.io
+  resources:
+  - hostleases
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - watch

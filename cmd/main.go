@@ -19,6 +19,7 @@ package main
 import (
 	"crypto/tls"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -38,12 +39,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	osacv1alpha1 "github.com/osac-project/bare-metal-operator/api/v1alpha1"
+	"github.com/osac-project/bare-metal-operator/internal/controller"
+	"github.com/osac-project/bare-metal-operator/internal/helpers"
 	// +kubebuilder:scaffold:imports
 )
 
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
+)
+
+const (
+	envHostDeletionPollInterval = "OSAC_HOST_DELETION_POLL_INTERVAL"
 )
 
 func init() {
@@ -201,6 +208,10 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err := setupBareMetalPoolController(mgr); err != nil {
+		setupLog.Error(err, "unable to setup controller", "controller", "BareMetalPool")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	if metricsCertWatcher != nil {
@@ -233,4 +244,22 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+// setupBareMetalPoolController registers the BareMetalPool controller.
+func setupBareMetalPoolController(mgr ctrl.Manager) error {
+	hostDeletionPollIntervalDuration := helpers.GetEnvWithDefault(
+		envHostDeletionPollInterval,
+		controller.DefaultHostDeletionPollIntervalDuration,
+	)
+
+	if err := controller.NewBareMetalPoolReconciler(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		hostDeletionPollIntervalDuration,
+	).SetupWithManager(mgr); err != nil {
+		return fmt.Errorf("unable to create controller: %w", err)
+	}
+
+	return nil
 }

@@ -21,6 +21,23 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// BareMetalPoolPhaseType is a valid value for .status.phase
+type BareMetalPoolPhaseType string
+
+const (
+	// BareMetalPoolPhaseProgressing means an update is in progress
+	BareMetalPoolPhaseProgressing BareMetalPoolPhaseType = "Progressing"
+
+	// BareMetalPoolPhaseFailed means the pool deployment or update has failed
+	BareMetalPoolPhaseFailed BareMetalPoolPhaseType = "Failed"
+
+	// BareMetalPoolPhaseReady means the pool and all associated resources are ready
+	BareMetalPoolPhaseReady BareMetalPoolPhaseType = "Ready"
+
+	// BareMetalPoolPhaseDeleting means there has been a request to delete the BareMetalPool
+	BareMetalPoolPhaseDeleting BareMetalPoolPhaseType = "Deleting"
+)
+
 // BareMetalPoolSpec defines the desired state of BareMetalPool.
 type BareMetalPoolSpec struct {
 	// HostSets defines the number of hosts needed for each host class.
@@ -38,6 +55,12 @@ type BareMetalPoolSpec struct {
 
 // BareMetalPoolStatus defines the observed state of BareMetalPool.
 type BareMetalPoolStatus struct {
+	// Phase provides a single-value overview of the state of the BareMetalPool
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Type=string
+	// +kubebuilder:validation:Enum=Progressing;Failed;Ready;Deleting
+	Phase BareMetalPoolPhaseType `json:"phase,omitempty"`
+
 	// HostSets shows the current allocation of hosts
 	// +kubebuilder:validation:Optional
 	HostSets []BareMetalHostSet `json:"hostSets,omitempty"`
@@ -85,7 +108,8 @@ type ProfileSpec struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=bmp;bmpool
-// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[?(@.type == 'Ready')].reason"
+// +kubebuilder:printcolumn:name="Phase",type="string",JSONPath=".status.phase"
+// +kubebuilder:printcolumn:name="Reason",type="string",JSONPath=".status.conditions[?(@.type == 'Ready')].reason"
 // +kubebuilder:printcolumn:name="Profile",type="string",JSONPath=".spec.profile.name"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
