@@ -20,14 +20,20 @@ spec:
     - jsonPath: .status.phase
       name: Phase
       type: string
-    - jsonPath: .spec.hostClass
-      name: HostClass
+    - jsonPath: .spec.hostType
+      name: HostType
       type: string
     - jsonPath: .spec.templateID
       name: Template
       type: string
-    - jsonPath: .spec.externalID
-      name: ExternalID
+    - jsonPath: .spec.hostClass
+      name: HostClass
+      type: string
+    - jsonPath: .spec.networkClass
+      name: NetworkClass
+      type: string
+    - jsonPath: .spec.externalHostID
+      name: ExternalHostID
       type: string
     name: v1alpha1
     schema:
@@ -54,15 +60,12 @@ spec:
           spec:
             description: HostLeaseSpec defines the desired state of HostLease.
             properties:
-              externalID:
-                description: ExternalID is the host ID from external inventory (used
-                  by Host Management Operator as node identifier).
+              externalHostID:
+                description: ExternalHostID is the host ID from external inventory
+                  (used by Host Management Operator as node identifier).
                 type: string
-                x-kubernetes-validations:
-                - message: field is immutable once set
-                  rule: oldSelf == '' || self == oldSelf
-              externalName:
-                description: ExternalName is the host name from external inventory.
+              externalHostName:
+                description: ExternalHostName is the host name from external inventory.
                 type: string
               hostClass:
                 description: HostClass is host management backend class (e.g. openstack).
@@ -166,7 +169,7 @@ spec:
                   selected host template.
                 type: string
             required:
-            - externalID
+            - externalHostID
             - hostType
             - templateID
             type: object
@@ -311,6 +314,7 @@ spec:
                 description: Phase provides a single-value overview of the state of
                   the HostLease
                 enum:
+                - Allocating
                 - Progressing
                 - Ready
                 - Failed

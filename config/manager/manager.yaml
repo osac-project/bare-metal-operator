@@ -92,7 +92,22 @@ spec:
           requests:
             cpu: 10m
             memory: 64Mi
-        volumeMounts: []
-      volumes: []
+        volumeMounts:
+          - name: inventory-config
+            mountPath: /etc/osac/inventory/
+          - name: lock-config
+            mountPath: /etc/osac/lock/
+          - name: clouds
+            mountPath: /etc/openstack/
+      volumes:
+        - name: inventory-config
+          secret:
+            secretName: osac-inventory-config
+        - name: lock-config
+          secret:
+            secretName: osac-lock-config
+        - name: clouds
+          secret:
+            secretName: osac-os-clouds
       serviceAccountName: controller-manager
       terminationGracePeriodSeconds: 10

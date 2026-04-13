@@ -29,15 +29,14 @@ type HostLeaseSpec struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="field is immutable"
 	HostType string `json:"hostType"`
-	// ExternalID is the host ID from external inventory (used by Host Management Operator as node identifier).
+	// ExternalHostID is the host ID from external inventory (used by Host Management Operator as node identifier).
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Type=string
-	// +kubebuilder:validation:XValidation:rule="oldSelf == '' || self == oldSelf",message="field is immutable once set"
-	ExternalID string `json:"externalID"`
-	// ExternalName is the host name from external inventory.
+	ExternalHostID string `json:"externalHostID"`
+	// ExternalHostName is the host name from external inventory.
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Type=string
-	ExternalName string `json:"externalName,omitempty"`
+	ExternalHostName string `json:"externalHostName,omitempty"`
 	// HostClass is host management backend class (e.g. openstack).
 	HostClass string `json:"hostClass,omitempty"`
 	// NetworkClass is the network class for this host (e.g. openstack).
@@ -80,6 +79,9 @@ const (
 type HostLeasePhaseType string
 
 const (
+	// HostLeasePhaseAllocating means searching for a free host to allocate
+	HostLeasePhaseAllocating HostLeasePhaseType = "Allocating"
+
 	// HostLeasePhaseProgressing means the host is being worked on (allocating, provisioning, power changes, etc.)
 	HostLeasePhaseProgressing HostLeasePhaseType = "Progressing"
 
@@ -186,7 +188,7 @@ type HostLeaseStatus struct {
 	// Phase provides a single-value overview of the state of the HostLease
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Type=string
-	// +kubebuilder:validation:Enum=Progressing;Ready;Failed;Deleting
+	// +kubebuilder:validation:Enum=Allocating;Progressing;Ready;Failed;Deleting
 	Phase HostLeasePhaseType `json:"phase,omitempty"`
 	// Jobs tracks the history of provision and deprovision operations
 	// Ordered chronologically, with latest operations at the end
@@ -237,9 +239,11 @@ func (h *HostLease) GetPoolID() (string, bool) {
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName=hl
 // +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
-// +kubebuilder:printcolumn:name="HostClass",type=string,JSONPath=`.spec.hostClass`
+// +kubebuilder:printcolumn:name="HostType",type=string,JSONPath=`.spec.hostType`
 // +kubebuilder:printcolumn:name="Template",type=string,JSONPath=`.spec.templateID`
-// +kubebuilder:printcolumn:name="ExternalID",type=string,JSONPath=`.spec.externalID`
+// +kubebuilder:printcolumn:name="HostClass",type=string,JSONPath=`.spec.hostClass`
+// +kubebuilder:printcolumn:name="NetworkClass",type=string,JSONPath=`.spec.networkClass`
+// +kubebuilder:printcolumn:name="ExternalHostID",type=string,JSONPath=`.spec.externalHostID`
 
 // HostLease is the Schema for the hostleases API.
 type HostLease struct {

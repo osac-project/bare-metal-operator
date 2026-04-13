@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"fmt"
@@ -37,10 +38,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/yaml"
 
 	osacv1alpha1 "github.com/osac-project/bare-metal-operator/api/v1alpha1"
 	"github.com/osac-project/bare-metal-operator/internal/controller"
 	"github.com/osac-project/bare-metal-operator/internal/helpers"
+	"github.com/osac-project/bare-metal-operator/internal/inventory"
+	"github.com/osac-project/bare-metal-operator/internal/lock"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -50,7 +54,12 @@ var (
 )
 
 const (
+	envInventoryConfigPath = "OSAC_INVENTORY_CONFIG_PATH"
+	envLockerConfigPath    = "OSAC_LOCKER_CONFIG_PATH"
+
 	envHostDeletionPollInterval = "OSAC_HOST_DELETION_POLL_INTERVAL"
+	envNoFreeHostsPollInterval  = "OSAC_NO_FREE_HOSTS_POLL_INTERVAL"
+	envTryLockFailPollInterval  = "OSAC_TRY_LOCK_FAIL_POLL_INTERVAL"
 )
 
 func init() {
@@ -94,6 +103,8 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	ctx := ctrl.SetupSignalHandler()
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -212,6 +223,11 @@ func main() {
 		setupLog.Error(err, "unable to setup controller", "controller", "BareMetalPool")
 		os.Exit(1)
 	}
+
+	if err := setupHostLeaseController(ctx, mgr); err != nil {
+		setupLog.Error(err, "unable to setup controller", "controller", "HostLease")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	if metricsCertWatcher != nil {
@@ -240,7 +256,7 @@ func main() {
 	}
 
 	setupLog.Info("starting manager")
-	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
+	if err := mgr.Start(ctx); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
@@ -261,5 +277,69 @@ func setupBareMetalPoolController(mgr ctrl.Manager) error {
 		return fmt.Errorf("unable to create controller: %w", err)
 	}
 
+	return nil
+}
+
+// setupHostLeaseController registers the HostLease controller.
+func setupHostLeaseController(ctx context.Context, mgr ctrl.Manager) error {
+	// Read and parse inventory configuration
+	inventoryConfigPath := helpers.GetEnvWithDefault(envInventoryConfigPath, "/etc/osac/inventory/inventory.yaml")
+	inventoryConfigData, err := os.ReadFile(inventoryConfigPath)
+	if err != nil {
+		return fmt.Errorf("failed to read inventory config file: %w", err)
+	}
+
+	var inventoryConfig inventory.Config
+	if err := yaml.Unmarshal(inventoryConfigData, &inventoryConfig); err != nil {
+		return fmt.Errorf("failed to parse inventory config: %w", err)
+	}
+
+	inventoryClient, err := inventory.NewClient(ctx, &inventoryConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create inventory client: %w", err)
+	}
+	if inventoryClient == nil {
+		return fmt.Errorf("unsupported inventory type %q", inventoryConfig.Type)
+	}
+
+	// Read and parse locker configuration
+	lockerConfigPath := helpers.GetEnvWithDefault(envLockerConfigPath, "/etc/osac/lock/lock.yaml")
+	lockerConfigData, err := os.ReadFile(lockerConfigPath)
+	if err != nil {
+		return fmt.Errorf("failed to read locker config file: %w", err)
+	}
+
+	var lockerConfig lock.Config
+	if err := yaml.Unmarshal(lockerConfigData, &lockerConfig); err != nil {
+		return fmt.Errorf("failed to parse locker config: %w", err)
+	}
+
+	locker, err := lock.NewLocker(ctx, &lockerConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create locker: %w", err)
+	}
+	if locker == nil {
+		return fmt.Errorf("unsupported lock type %q", lockerConfig.Type)
+	}
+
+	noFreeHostsPollInterval := helpers.GetEnvWithDefault(
+		envNoFreeHostsPollInterval,
+		controller.DefaultNoFreeHostsPollIntervalDuration,
+	)
+	tryLockFailPollInterval := helpers.GetEnvWithDefault(
+		envTryLockFailPollInterval,
+		controller.DefaultTryLockFailPollIntervalDuration,
+	)
+
+	if err := controller.NewHostLeaseReconciler(
+		mgr.GetClient(),
+		mgr.GetScheme(),
+		inventoryClient,
+		locker,
+		noFreeHostsPollInterval,
+		tryLockFailPollInterval,
+	).SetupWithManager(mgr); err != nil {
+		return fmt.Errorf("hostlease controller: %w", err)
+	}
 	return nil
 }
