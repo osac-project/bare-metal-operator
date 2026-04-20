@@ -18,8 +18,11 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
     - jsonPath: .status.conditions[?(@.type == 'Ready')].reason
-      name: Status
+      name: Reason
       type: string
     - jsonPath: .spec.profile.name
       name: Profile
@@ -241,6 +244,15 @@ spec:
                 description: LastUpdated is the timestamp when the status was last
                   updated
                 format: date-time
+                type: string
+              phase:
+                description: Phase provides a single-value overview of the state of
+                  the BareMetalPool
+                enum:
+                - Progressing
+                - Failed
+                - Ready
+                - Deleting
                 type: string
             type: object
         type: object

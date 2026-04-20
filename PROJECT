@@ -14,6 +14,7 @@ resources:
 - api:
     crdVersion: v1
     namespaced: true
+  controller: true
   domain: openshift.io
   group: osac
   kind: BareMetalPool
