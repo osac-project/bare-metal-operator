@@ -44,7 +44,6 @@ import (
 	"github.com/osac-project/bare-metal-operator/internal/controller"
 	"github.com/osac-project/bare-metal-operator/internal/helpers"
 	"github.com/osac-project/bare-metal-operator/internal/inventory"
-	"github.com/osac-project/bare-metal-operator/internal/lock"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -55,11 +54,11 @@ var (
 
 const (
 	envInventoryConfigPath = "OSAC_INVENTORY_CONFIG_PATH"
-	envLockerConfigPath    = "OSAC_LOCKER_CONFIG_PATH"
 
-	envHostDeletionPollInterval = "OSAC_HOST_DELETION_POLL_INTERVAL"
-	envNoFreeHostsPollInterval  = "OSAC_NO_FREE_HOSTS_POLL_INTERVAL"
-	envTryLockFailPollInterval  = "OSAC_TRY_LOCK_FAIL_POLL_INTERVAL"
+	envHostDeletionPollInterval        = "OSAC_HOST_DELETION_POLL_INTERVAL"
+	envNoFreeHostsPollInterval         = "OSAC_NO_FREE_HOSTS_POLL_INTERVAL"
+	envTryLockFailPollInterval         = "OSAC_TRY_LOCK_FAIL_POLL_INTERVAL"
+	envHostLeaseMaxConcurrentReconcile = "OSAC_HOSTLEASE_MAX_CONCURRENT_RECONCILES"
 )
 
 func init() {
@@ -302,26 +301,6 @@ func setupHostLeaseController(ctx context.Context, mgr ctrl.Manager) error {
 		return fmt.Errorf("unsupported inventory type %q", inventoryConfig.Type)
 	}
 
-	// Read and parse locker configuration
-	lockerConfigPath := helpers.GetEnvWithDefault(envLockerConfigPath, "/etc/osac/lock/lock.yaml")
-	lockerConfigData, err := os.ReadFile(lockerConfigPath)
-	if err != nil {
-		return fmt.Errorf("failed to read locker config file: %w", err)
-	}
-
-	var lockerConfig lock.Config
-	if err := yaml.Unmarshal(lockerConfigData, &lockerConfig); err != nil {
-		return fmt.Errorf("failed to parse locker config: %w", err)
-	}
-
-	locker, err := lock.NewLocker(ctx, &lockerConfig)
-	if err != nil {
-		return fmt.Errorf("failed to create locker: %w", err)
-	}
-	if locker == nil {
-		return fmt.Errorf("unsupported lock type %q", lockerConfig.Type)
-	}
-
 	noFreeHostsPollInterval := helpers.GetEnvWithDefault(
 		envNoFreeHostsPollInterval,
 		controller.DefaultNoFreeHostsPollIntervalDuration,
@@ -330,15 +309,19 @@ func setupHostLeaseController(ctx context.Context, mgr ctrl.Manager) error {
 		envTryLockFailPollInterval,
 		controller.DefaultTryLockFailPollIntervalDuration,
 	)
+	maxConcurrentReconciles := helpers.GetEnvWithDefault(
+		envHostLeaseMaxConcurrentReconcile,
+		1,
+		func(v int) bool { return v > 0 },
+	)
 
 	if err := controller.NewHostLeaseReconciler(
 		mgr.GetClient(),
 		mgr.GetScheme(),
 		inventoryClient,
-		locker,
 		noFreeHostsPollInterval,
 		tryLockFailPollInterval,
-	).SetupWithManager(mgr); err != nil {
+	).SetupWithManager(mgr, maxConcurrentReconciles); err != nil {
 		return fmt.Errorf("hostlease controller: %w", err)
 	}
 	return nil
