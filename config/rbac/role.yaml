@@ -8,6 +8,7 @@ rules:
   - osac.openshift.io
   resources:
   - baremetalpools
+  - hostleases
   verbs:
   - create
   - delete
@@ -20,23 +21,15 @@ rules:
   - osac.openshift.io
   resources:
   - baremetalpools/finalizers
+  - hostleases/finalizers
   verbs:
   - update
 - apiGroups:
   - osac.openshift.io
   resources:
   - baremetalpools/status
+  - hostleases/status
   verbs:
   - get
   - patch
   - update
-- apiGroups:
-  - osac.openshift.io
-  resources:
-  - hostleases
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - watch

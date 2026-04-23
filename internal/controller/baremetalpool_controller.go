@@ -345,8 +345,8 @@ func (r *BareMetalPoolReconciler) createHostLeaseCR(
 		},
 		Spec: v1alpha1.HostLeaseSpec{
 			HostType:           hostType,
-			ExternalID:         "",
-			ExternalName:       "",
+			ExternalHostID:     "",
+			ExternalHostName:   "",
 			Selector:           selector,
 			TemplateID:         templateID,
 			TemplateParameters: templateParameters,
