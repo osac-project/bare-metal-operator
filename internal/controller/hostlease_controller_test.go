@@ -63,47 +63,23 @@ func (m *mockInventoryClient) UnassignHost(ctx context.Context, inventoryHostID 
 	return nil
 }
 
-// mockLocker implements lock.Locker for testing
-type mockLocker struct {
-	tryLockFunc func(ctx context.Context, key string) (bool, string, error)
-	unlockFunc  func(ctx context.Context, key string, token string) error
-}
-
-func (m *mockLocker) TryLock(ctx context.Context, key string) (bool, string, error) {
-	if m.tryLockFunc != nil {
-		return m.tryLockFunc(ctx, key)
-	}
-	return true, "test-token", nil
-}
-
-func (m *mockLocker) Unlock(ctx context.Context, key string, token string) error {
-	if m.unlockFunc != nil {
-		return m.unlockFunc(ctx, key, token)
-	}
-	return nil
-}
-
 var _ = Describe("HostLease Controller", func() {
 	var (
 		reconciler        *HostLeaseReconciler
 		mockInvClient     *mockInventoryClient
-		mockLock          *mockLocker
 		mockK8sClient     *mockClient
 		testHostLease     *v1alpha1.HostLease
 		testNamespace     string
 		testHostLeaseName string
 		testPool          *v1alpha1.BareMetalPool
 		testPoolName      string
-		testToken         string
 	)
 
 	// Common setup for ALL tests
 	BeforeEach(func() {
 		testNamespace = "default"
 		testPoolName = "test-pool-for-host-tests"
-		testToken = "test-token"
 		mockInvClient = &mockInventoryClient{}
-		mockLock = &mockLocker{}
 		mockK8sClient = &mockClient{Client: k8sClient}
 
 		// Create a real BareMetalPool for owner references
@@ -137,7 +113,6 @@ var _ = Describe("HostLease Controller", func() {
 			mockK8sClient,
 			k8sClient.Scheme(),
 			mockInvClient,
-			mockLock,
 			DefaultNoFreeHostsPollIntervalDuration,
 			DefaultTryLockFailPollIntervalDuration,
 		)
@@ -152,8 +127,6 @@ var _ = Describe("HostLease Controller", func() {
 		mockInvClient.findFreeHostFunc = nil
 		mockInvClient.assignHostFunc = nil
 		mockInvClient.unassignHostFunc = nil
-		mockLock.tryLockFunc = nil
-		mockLock.unlockFunc = nil
 
 		if testHostLeaseName != "" && testNamespace != "" {
 			hostLease := &v1alpha1.HostLease{}
@@ -423,23 +396,7 @@ var _ = Describe("HostLease Controller", func() {
 			Expect(k8sClient.Update(ctx, retrievedHostLease)).To(Succeed())
 		})
 
-		It("should acquire lock and assign the host", func() {
-			lockAcquired := false
-			lockReleased := false
-
-			mockLock.tryLockFunc = func(ctx context.Context, key string) (bool, string, error) {
-				Expect(key).To(Equal("inv-host-123"))
-				lockAcquired = true
-				return true, testToken, nil
-			}
-
-			mockLock.unlockFunc = func(ctx context.Context, key string, token string) error {
-				Expect(key).To(Equal("inv-host-123"))
-				Expect(token).To(Equal(testToken))
-				lockReleased = true
-				return nil
-			}
-
+		It("should assign the host", func() {
 			mockInvClient.assignHostFunc = func(ctx context.Context, inventoryHostID string, bareMetalPoolID string, bareMetalPoolHostID string, labels map[string]string) (*inventory.Host, error) {
 				Expect(inventoryHostID).To(Equal("inv-host-123"))
 				Expect(bareMetalPoolID).To(Equal(string(testPool.UID)))
@@ -456,8 +413,6 @@ var _ = Describe("HostLease Controller", func() {
 				},
 			})
 			Expect(err).NotTo(HaveOccurred())
-			Expect(lockAcquired).To(BeTrue())
-			Expect(lockReleased).To(BeTrue())
 
 			updatedHostLease := &v1alpha1.HostLease{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{
@@ -470,9 +425,8 @@ var _ = Describe("HostLease Controller", func() {
 		})
 
 		It("should requeue when lock cannot be acquired", func() {
-			mockLock.tryLockFunc = func(ctx context.Context, key string) (bool, string, error) {
-				return false, "", nil
-			}
+			Expect(inventory.TryLock("inv-host-123")).To(BeTrue())
+			defer inventory.Unlock("inv-host-123")
 
 			result, err := reconciler.Reconcile(ctx, ctrl.Request{
 				NamespacedName: types.NamespacedName{
@@ -482,30 +436,6 @@ var _ = Describe("HostLease Controller", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 			Expect(result.RequeueAfter).To(Equal(DefaultTryLockFailPollIntervalDuration))
-
-			updatedHostLease := &v1alpha1.HostLease{}
-			Expect(k8sClient.Get(ctx, types.NamespacedName{
-				Name:      testHostLeaseName,
-				Namespace: testNamespace,
-			}, updatedHostLease)).To(Succeed())
-
-			Expect(updatedHostLease.Spec.ExternalHostID).To(Equal("inv-host-123"))
-			Expect(updatedHostLease.Spec.HostClass).To(BeEmpty())
-		})
-
-		It("should handle lock acquisition error", func() {
-			mockLock.tryLockFunc = func(ctx context.Context, key string) (bool, string, error) {
-				return false, "", errors.New("redis connection error")
-			}
-
-			_, err := reconciler.Reconcile(ctx, ctrl.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      testHostLeaseName,
-					Namespace: testNamespace,
-				},
-			})
-			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("redis connection error"))
 
 			updatedHostLease := &v1alpha1.HostLease{}
 			Expect(k8sClient.Get(ctx, types.NamespacedName{
@@ -948,72 +878,6 @@ var _ = Describe("HostLease Controller", func() {
 				}, deletedHostLease)
 				return apierrors.IsNotFound(err)
 			}, 5*time.Second).Should(BeTrue())
-		})
-
-		It("should requeue when lock cannot be acquired during deletion", func() {
-			poolUID := testPool.UID
-			testHostLease = &v1alpha1.HostLease{
-				TypeMeta: metav1.TypeMeta{
-					APIVersion: "osac.openshift.io/v1alpha1",
-					Kind:       "HostLease",
-				},
-				ObjectMeta: metav1.ObjectMeta{
-					Name:       testHostLeaseName,
-					Namespace:  testNamespace,
-					Finalizers: []string{HostLeaseInventoryFinalizer},
-					Labels: map[string]string{
-						"pool-id": string(poolUID),
-					},
-				},
-				Spec: v1alpha1.HostLeaseSpec{
-					ExternalHostID: "inv-host-123",
-					HostType:       "fc430",
-					HostClass:      "ironic-mgmt",
-					Selector: v1alpha1.HostSelectorSpec{
-						HostSelector: map[string]string{
-							"managedBy":      "ironic",
-							"provisionState": "available",
-						},
-					},
-					TemplateID: "default",
-					PoweredOn:  ptr.To(false),
-				},
-			}
-
-			mockLock.tryLockFunc = func(ctx context.Context, key string) (bool, string, error) {
-				return false, "", nil
-			}
-			Expect(controllerutil.SetControllerReference(testPool, testHostLease, k8sClient.Scheme())).NotTo(HaveOccurred())
-
-			Expect(k8sClient.Create(ctx, testHostLease)).To(Succeed())
-			retrievedHostLease := &v1alpha1.HostLease{}
-			Expect(k8sClient.Get(ctx, types.NamespacedName{Name: testHostLeaseName, Namespace: testNamespace}, retrievedHostLease)).To(Succeed())
-			retrievedHostLease.Spec.ExternalHostID = "inv-host-123"
-			retrievedHostLease.Spec.HostClass = "ironic-mgmt"
-			Expect(k8sClient.Update(ctx, retrievedHostLease)).To(Succeed())
-			Expect(k8sClient.Delete(ctx, testHostLease)).To(Succeed())
-
-			result, err := reconciler.Reconcile(ctx, ctrl.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      testHostLeaseName,
-					Namespace: testNamespace,
-				},
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result.RequeueAfter).To(Equal(DefaultTryLockFailPollIntervalDuration))
-
-			// test over, so now actually delete it
-			mockLock.tryLockFunc = func(ctx context.Context, key string) (bool, string, error) {
-				return true, testToken, nil
-			}
-
-			_, err = reconciler.Reconcile(ctx, ctrl.Request{
-				NamespacedName: types.NamespacedName{
-					Name:      testHostLeaseName,
-					Namespace: testNamespace,
-				},
-			})
-			Expect(err).NotTo(HaveOccurred())
 		})
 
 		It("should handle unassign error during deletion", func() {

@@ -48,7 +48,10 @@ type Client interface {
 	// FindFreeHost returns a host with matching fields that is not already assigned
 	FindFreeHost(ctx context.Context, matchExpressions map[string]string) (*Host, error)
 
-	// AssignHost updates the host by marking it as assigned, returns the host if the update request was performed
+	// AssignHost attempts to mark a host as assigned
+	// Returns the assigned host if successful, or nil if the host is unavailable
+	// Returns an error only for backend failures
+	// This operation must be strongly consistent: it only returns when the inventory state reflects the assignment
 	AssignHost(ctx context.Context, inventoryHostID string, bareMetalPoolID string, bareMetalPoolHostID string, labels map[string]string) (*Host, error)
 
 	// UnassignHost updates the host by undoing the assign operation

@@ -48,30 +48,10 @@ networkClass: openstack
 
 ### Host Lock
 
-The operator uses distributed locking to coordinate host assignments across
-multiple controller instances and prevent race conditions when claiming hosts.
-
-**Configuration file:** `/etc/osac/lock/lock.yaml` (default)
-
-The path can be overridden with the `OSAC_LOCKER_CONFIG_PATH` environment variable.
-
-**Example:**
-
-```yaml
-type: redis
-ttl: 30s
-options:
-  addr: osac-redis-inventory:6379
-  db: 0
-```
-
-**Fields:**
-- `type` — lock backend type (currently only `redis` is supported)
-- `ttl` — lock expiration time (duration format, e.g., `30s`, `1m`)
-- `options` — backend-specific configuration options
-  - For Redis:
-    - `addr` — Redis server address (default: `localhost:6379`)
-    - `db` — Redis database number (default: `0`)
+The inventory package provides in-memory locking (`inventory.TryLock()` and
+`inventory.Unlock()`) to coordinate host assignments and prevent race conditions
+when claiming hosts within a single controller instance. Locks are automatically
+released via deferred unlock calls.
 
 ### Environment Variables
 
@@ -80,7 +60,6 @@ The following environment variables can be used to configure controller behavior
 #### Configuration Paths
 
 - **`OSAC_INVENTORY_CONFIG_PATH`** — Path to the inventory configuration file. Default: `/etc/osac/inventory/inventory.yaml`
-- **`OSAC_LOCKER_CONFIG_PATH`** — Path to the distributed lock configuration file. Default: `/etc/osac/lock/lock.yaml`
 
 #### BareMetalPool Controller
 
@@ -96,8 +75,6 @@ The following environment variables can be used to configure controller behavior
 env:
   - name: OSAC_INVENTORY_CONFIG_PATH
     value: "/custom/path/inventory.yaml"
-  - name: OSAC_LOCKER_CONFIG_PATH
-    value: "/custom/path/lock.yaml"
   - name: OSAC_HOST_DELETION_POLL_INTERVAL
     value: "10s"
   - name: OSAC_NO_FREE_HOSTS_POLL_INTERVAL

@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
@@ -33,7 +34,6 @@ import (
 
 	"github.com/osac-project/bare-metal-operator/api/v1alpha1"
 	"github.com/osac-project/bare-metal-operator/internal/inventory"
-	"github.com/osac-project/bare-metal-operator/internal/lock"
 )
 
 // HostLeaseReconciler reconciles a HostLease object
@@ -41,7 +41,6 @@ type HostLeaseReconciler struct {
 	client.Client
 	Scheme                          *runtime.Scheme
 	InventoryClient                 inventory.Client
-	Locker                          lock.Locker
 	NoFreeHostsPollIntervalDuration time.Duration
 	TryLockFailPollIntervalDuration time.Duration
 }
@@ -50,7 +49,6 @@ func NewHostLeaseReconciler(
 	client client.Client,
 	scheme *runtime.Scheme,
 	inventoryClient inventory.Client,
-	locker lock.Locker,
 	noFreeHostsPollIntervalDuration time.Duration,
 	tryLockFailPollIntervalDuration time.Duration,
 ) *HostLeaseReconciler {
@@ -66,7 +64,6 @@ func NewHostLeaseReconciler(
 		Client:                          client,
 		Scheme:                          scheme,
 		InventoryClient:                 inventoryClient,
-		Locker:                          locker,
 		NoFreeHostsPollIntervalDuration: noFreeHostsPollIntervalDuration,
 		TryLockFailPollIntervalDuration: tryLockFailPollIntervalDuration,
 	}
@@ -100,10 +97,13 @@ func (r *HostLeaseReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *HostLeaseReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *HostLeaseReconciler) SetupWithManager(mgr ctrl.Manager, maxConcurrentReconciles int) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1alpha1.HostLease{}).
 		Named("hostlease").
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: maxConcurrentReconciles,
+		}).
 		WithEventFilter(predicate.Funcs{
 			UpdateFunc: func(e event.UpdateEvent) bool {
 				newHostLease := e.ObjectNew.(*v1alpha1.HostLease)
@@ -191,22 +191,12 @@ func (r *HostLeaseReconciler) handleUpdate(ctx context.Context, hostLease *v1alp
 		return ctrl.Result{}, nil
 	}
 
-	lockKey := hostLease.Spec.ExternalHostID
-	acquiredLock, lockToken, err := r.Locker.TryLock(ctx, lockKey)
-	if err != nil {
-		log.Error(err, "Failed to lock host", "InventoryHostID", lockKey)
-		return ctrl.Result{}, err
-	}
-	if !acquiredLock {
-		log.Info("Lock for " + lockKey + " is currently held, retrying...")
+	hostID := hostLease.Spec.ExternalHostID
+	if !inventory.TryLock(hostID) {
+		log.Info("Lock is currently held, retrying", "InventoryHostID", hostID)
 		return ctrl.Result{RequeueAfter: r.TryLockFailPollIntervalDuration}, nil
 	}
-	defer func() {
-		// assume that Unlock has a ttl as a safety net
-		if err := r.Locker.Unlock(ctx, lockKey, lockToken); err != nil {
-			log.Error(err, "Failed to release lock; relying on TTL", "key", lockKey)
-		}
-	}()
+	defer inventory.Unlock(hostID)
 
 	inventoryHost, err := r.InventoryClient.AssignHost(
 		ctx,
@@ -220,7 +210,7 @@ func (r *HostLeaseReconciler) handleUpdate(ctx context.Context, hostLease *v1alp
 		return ctrl.Result{}, err
 	}
 	if inventoryHost == nil {
-		log.Info("Host " + lockKey + " is acquired by a different HostLease, unsetting ExternalHostID")
+		log.Info("Host is acquired by a different HostLease, unsetting ExternalHostID", "InventoryHostID", hostID)
 		hostLease.Spec.ExternalHostID = ""
 		if err = r.Update(ctx, hostLease); err != nil {
 			log.Error(err, "Failed to delete HostLease CR")
@@ -261,22 +251,14 @@ func (r *HostLeaseReconciler) handleDeletion(ctx context.Context, hostLease *v1a
 	if hostLease.Spec.ExternalHostID != "" {
 		log.Info("Unassigning host from inventory", "InventoryHostID", hostLease.Spec.ExternalHostID)
 
-		acquiredLock, lockToken, err := r.Locker.TryLock(ctx, hostLease.Spec.ExternalHostID)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		if !acquiredLock {
-			log.Info("Could not acquire lock for host", "InventoryHostID", hostLease.Spec.ExternalHostID)
+		hostID := hostLease.Spec.ExternalHostID
+		if !inventory.TryLock(hostID) {
+			log.Info("Could not acquire lock for host", "InventoryHostID", hostID)
 			return ctrl.Result{RequeueAfter: r.TryLockFailPollIntervalDuration}, nil
 		}
-		defer func() {
-			// assume that Unlock has a ttl as a safety net
-			if err := r.Locker.Unlock(ctx, hostLease.Spec.ExternalHostID, lockToken); err != nil {
-				log.Error(err, "Failed to release lock; relying on TTL", "key", hostLease.Spec.ExternalHostID)
-			}
-		}()
+		defer inventory.Unlock(hostID)
 
-		err = r.InventoryClient.UnassignHost(ctx, hostLease.Spec.ExternalHostID, nil)
+		err := r.InventoryClient.UnassignHost(ctx, hostID, nil)
 		if err != nil {
 			log.Error(err, "Failed to unassign host in inventory")
 			return ctrl.Result{}, err
