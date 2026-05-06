@@ -4,5 +4,5 @@ resources:
 - manager.yaml
 images:
 - name: controller
-  newName: ghcr.io/osac-project/bare-metal-operator
+  newName: ghcr.io/osac-project/bare-metal-fulfillment-operator
   newTag: latest

@@ -1,4 +1,4 @@
-# This rule is not used by the project bare-metal-operator itself.
+# This rule is not used by the project bare-metal-fulfillment-operator itself.
 # It is provided to allow the cluster admin to help manage permissions for users.
 #
 # Grants full permissions ('*') over osac.openshift.io.
@@ -9,7 +9,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
-    app.kubernetes.io/name: bare-metal-operator
+    app.kubernetes.io/name: bare-metal-fulfillment-operator
     app.kubernetes.io/managed-by: kustomize
   name: baremetalpool-admin-role
 rules:

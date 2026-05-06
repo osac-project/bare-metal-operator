@@ -8,8 +8,8 @@ layout:
 plugins:
   manifests.sdk.operatorframework.io/v2: {}
   scorecard.sdk.operatorframework.io/v2: {}
-projectName: bare-metal-operator
-repo: github.com/osac-project/bare-metal-operator
+projectName: bare-metal-fulfillment-operator
+repo: github.com/osac-project/bare-metal-fulfillment-operator
 resources:
 - api:
     crdVersion: v1
@@ -18,7 +18,7 @@ resources:
   domain: openshift.io
   group: osac
   kind: BareMetalPool
-  path: github.com/osac-project/bare-metal-operator/api/v1alpha1
+  path: github.com/osac-project/bare-metal-fulfillment-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -27,6 +27,6 @@ resources:
   domain: openshift.io
   group: osac
   kind: HostLease
-  path: github.com/osac-project/bare-metal-operator/api/v1alpha1
+  path: github.com/osac-project/bare-metal-fulfillment-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

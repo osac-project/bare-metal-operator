@@ -40,10 +40,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/yaml"
 
-	osacv1alpha1 "github.com/osac-project/bare-metal-operator/api/v1alpha1"
-	"github.com/osac-project/bare-metal-operator/internal/controller"
-	"github.com/osac-project/bare-metal-operator/internal/helpers"
-	"github.com/osac-project/bare-metal-operator/internal/inventory"
+	osacv1alpha1 "github.com/osac-project/bare-metal-fulfillment-operator/api/v1alpha1"
+	"github.com/osac-project/bare-metal-fulfillment-operator/internal/controller"
+	"github.com/osac-project/bare-metal-fulfillment-operator/internal/helpers"
+	"github.com/osac-project/bare-metal-fulfillment-operator/internal/inventory"
 	// +kubebuilder:scaffold:imports
 )
 

@@ -37,13 +37,8 @@ linters:
       - linters:
           - dupl
           - lll
+          - goconst
         path: internal/*
-      - linters:
-          - dupl
-        path: api/v1alpha1/clusterorder_clusterreference.go
-      - linters:
-          - dupl
-        path: api/v1alpha1/computeinstance_virtualmachinereference.go
     paths:
       - third_party$
       - builtin$

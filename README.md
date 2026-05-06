@@ -1,11 +1,11 @@
-# Bare Metal Operator
+# Bare Metal Fulfillment Operator
 
 Kubernetes operator for managing bare metal host pools in the [Open Sovereign AI
 Cloud (OSAC)](https://github.com/osac-project) project.
 
 ## Description
 
-Bare Metal Operator is part of the OSAC project. It watches the following custom
+Bare Metal Fulfillment Operator is part of the OSAC project. It watches the following custom
 resources and reconciles them to their desired state:
 
 - **BareMetalPool** (`bmp`, `bmpool`) — provisions pools of bare metal hosts
@@ -97,7 +97,7 @@ env:
 **Build and push your image to the location specified by `IMG`:**
 
 ``` sh
-make image-build image-push IMG=<some-registry>/bare-metal-operator:tag
+make image-build image-push IMG=<some-registry>/bare-metal-fulfillment-operator:tag
 ```
 
 **NOTE:** This image ought to be published in the personal registry you
@@ -114,7 +114,7 @@ make install
 **Deploy the Manager to the cluster with the image specified by `IMG`:**
 
 ``` sh
-make deploy IMG=<some-registry>/bare-metal-operator:tag
+make deploy IMG=<some-registry>/bare-metal-fulfillment-operator:tag
 ```
 
 > **NOTE**: If you encounter RBAC errors, you may need to grant yourself
@@ -158,7 +158,7 @@ users.
 1.  Build the installer for the image built and published in the registry:
 
 ``` sh
-make build-installer IMG=<some-registry>/bare-metal-operator:tag
+make build-installer IMG=<some-registry>/bare-metal-fulfillment-operator:tag
 ```
 
 NOTE: The makefile target mentioned above generates an 'install.yaml' file in
@@ -171,7 +171,7 @@ Users can just run kubectl apply -f <URL for YAML BUNDLE> to install the
 project, i.e.:
 
 ``` sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/bare-metal-operator/<tag or branch>/dist/install.yaml
+kubectl apply -f https://raw.githubusercontent.com/<org>/bare-metal-fulfillment-operator/<tag or branch>/dist/install.yaml
 ```
 
 ## Contributing

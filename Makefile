@@ -28,8 +28,8 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 # This variable is used to construct full image tags for bundle and catalog images.
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
-# openshift.io/bare-metal-operator-bundle:$VERSION and openshift.io/bare-metal-operator-catalog:$VERSION.
-IMAGE_TAG_BASE ?= openshift.io/bare-metal-operator
+# openshift.io/bare-metal-fulfillment-operator-bundle:$VERSION and openshift.io/bare-metal-fulfillment-operator-catalog:$VERSION.
+IMAGE_TAG_BASE ?= openshift.io/bare-metal-fulfillment-operator
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
@@ -50,7 +50,7 @@ endif
 # This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
 OPERATOR_SDK_VERSION ?= v1.42.1
 # Image URL to use all building/pushing image targets
-IMG ?= ghcr.io/osac-project/bare-metal-operator:latest
+IMG ?= ghcr.io/osac-project/bare-metal-fulfillment-operator:latest
 # Name of Containerfile
 CONTAINERFILE ?= Containerfile
 
@@ -118,7 +118,7 @@ test: manifests generate fmt vet setup-envtest ## Run tests.
 # The default setup assumes Kind is pre-installed and builds/loads the Manager Docker image locally.
 # CertManager is installed by default; skip with:
 # - CERT_MANAGER_INSTALL_SKIP=true
-KIND_CLUSTER ?= bare-metal-operator-test-e2e
+KIND_CLUSTER ?= bare-metal-fulfillment-operator-test-e2e
 
 .PHONY: setup-test-e2e
 setup-test-e2e: ## Set up a Kind cluster for e2e tests if it does not exist
@@ -189,10 +189,10 @@ PLATFORMS ?= linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
 docker-buildx: ## Build and push docker image for the manager for cross-platform support
 	# copy existing Containerfile and insert --platform=${BUILDPLATFORM} into Containerfile.cross, and preserve the original Containerfile
 	sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' ${CONTAINERFILE} > ${CONTAINERFILE}.cross
-	- $(CONTAINER_TOOL) buildx create --name bare-metal-operator-builder
-	$(CONTAINER_TOOL) buildx use bare-metal-operator-builder
+	- $(CONTAINER_TOOL) buildx create --name bare-metal-fulfillment-operator-builder
+	$(CONTAINER_TOOL) buildx use bare-metal-fulfillment-operator-builder
 	- $(CONTAINER_TOOL) buildx build --push --platform=$(PLATFORMS) --tag ${IMG} -f ${CONTAINERFILE}.cross .
-	- $(CONTAINER_TOOL) buildx rm bare-metal-operator-builder
+	- $(CONTAINER_TOOL) buildx rm bare-metal-fulfillment-operator-builder
 	rm ${CONTAINERFILE}.cross
 
 .PHONY: build-installer
