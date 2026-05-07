@@ -36,7 +36,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
-	"github.com/osac-project/bare-metal-operator/api/v1alpha1"
+	"github.com/osac-project/bare-metal-fulfillment-operator/api/v1alpha1"
 )
 
 // BareMetalPoolReconciler reconciles a BareMetalPool object

@@ -1,7 +1,7 @@
 # These resources constitute the fully configured set of manifests
 # used to generate the 'manifests/' directory in a bundle.
 resources:
-- bases/bare-metal-operator.clusterserviceversion.yaml
+- bases/bare-metal-fulfillment-operator.clusterserviceversion.yaml
 - ../default
 - ../samples
 - ../scorecard

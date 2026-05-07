@@ -2,7 +2,7 @@ apiVersion: osac.openshift.io/v1alpha1
 kind: BareMetalPool
 metadata:
   labels:
-    app.kubernetes.io/name: bare-metal-operator
+    app.kubernetes.io/name: bare-metal-fulfillment-operator
     app.kubernetes.io/managed-by: kustomize
   name: baremetalpool-sample
 spec:

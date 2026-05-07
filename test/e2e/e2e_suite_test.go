@@ -25,7 +25,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/osac-project/bare-metal-operator/test/utils"
+	"github.com/osac-project/bare-metal-fulfillment-operator/test/utils"
 )
 
 var (
@@ -39,7 +39,7 @@ var (
 
 	// projectImage is the name of the image which will be build and loaded
 	// with the code source changes to be tested.
-	projectImage = "example.com/bare-metal-operator:v0.0.1"
+	projectImage = "example.com/bare-metal-fulfillment-operator:v0.0.1"
 )
 
 // TestE2E runs the end-to-end (e2e) test suite for the project. These tests execute in an isolated,
@@ -48,7 +48,7 @@ var (
 // CertManager.
 func TestE2E(t *testing.T) {
 	RegisterFailHandler(Fail)
-	_, _ = fmt.Fprintf(GinkgoWriter, "Starting bare-metal-operator integration test suite\n")
+	_, _ = fmt.Fprintf(GinkgoWriter, "Starting bare-metal-fulfillment-operator integration test suite\n")
 	RunSpecs(t, "e2e suite")
 }
 

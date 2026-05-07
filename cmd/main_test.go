@@ -22,7 +22,7 @@ import (
 	. "github.com/onsi/ginkgo/v2" //nolint:revive,staticcheck
 	. "github.com/onsi/gomega"    //nolint:revive,staticcheck
 
-	osacv1alpha1 "github.com/osac-project/bare-metal-operator/api/v1alpha1"
+	osacv1alpha1 "github.com/osac-project/bare-metal-fulfillment-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -44,7 +44,7 @@ var _ = Describe("Scheme Initialization", func() {
 
 		// Verify OSAC BareMetalPool types are registered
 		Expect(scheme.IsGroupRegistered(osacv1alpha1.GroupVersion.Group)).To(BeTrue(),
-			"OSAC bare-metal-operator types should be registered")
+			"OSAC bare-metal-fulfillment-operator types should be registered")
 	})
 
 	It("should recognize BareMetalPool type", func() {
