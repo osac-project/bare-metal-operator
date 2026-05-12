@@ -92,6 +92,11 @@ spec:
           requests:
             cpu: 10m
             memory: 64Mi
+        env:
+          - name: OSAC_BARE_METAL_FULFILLMENT_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
         volumeMounts:
           - name: inventory-config
             mountPath: /etc/osac/inventory/

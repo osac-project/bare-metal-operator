@@ -32,7 +32,9 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/certwatcher"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
@@ -54,14 +56,17 @@ var (
 )
 
 const (
+	// Manager level configuration
+	envBareMetalFulfillmentNamespace   = "OSAC_BARE_METAL_FULFILLMENT_NAMESPACE"
+	envHostLeaseMaxConcurrentReconcile = "OSAC_HOSTLEASE_MAX_CONCURRENT_RECONCILES"
+
+	// Controller level configuration
 	envInventoryConfigPath = "OSAC_INVENTORY_CONFIG_PATH"
 	envProfileConfigPath   = "OSAC_PROFILE_CONFIG_PATH"
 
 	envHostDeletionPollInterval = "OSAC_HOST_DELETION_POLL_INTERVAL"
 	envNoFreeHostsPollInterval  = "OSAC_NO_FREE_HOSTS_POLL_INTERVAL"
 	envTryLockFailPollInterval  = "OSAC_TRY_LOCK_FAIL_POLL_INTERVAL"
-
-	envHostLeaseMaxConcurrentReconcile = "OSAC_HOSTLEASE_MAX_CONCURRENT_RECONCILES"
 )
 
 func init() {
@@ -197,6 +202,12 @@ func main() {
 		})
 	}
 
+	bareMetalFulfillmentNamespace := os.Getenv(envBareMetalFulfillmentNamespace)
+	if bareMetalFulfillmentNamespace == "" {
+		setupLog.Error(nil, fmt.Sprintf("%s environment variable must be set", envBareMetalFulfillmentNamespace))
+		os.Exit(1)
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		Metrics:                metricsServerOptions,
@@ -204,6 +215,20 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "89c2406a.openshift.io",
+		Cache: cache.Options{
+			ByObject: map[client.Object]cache.ByObject{
+				&osacv1alpha1.BareMetalPool{}: {
+					Namespaces: map[string]cache.Config{
+						bareMetalFulfillmentNamespace: {},
+					},
+				},
+				&osacv1alpha1.HostLease{}: {
+					Namespaces: map[string]cache.Config{
+						bareMetalFulfillmentNamespace: {},
+					},
+				},
+			},
+		},
 		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
 		// when the Manager ends. This requires the binary to immediately end when the
 		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
